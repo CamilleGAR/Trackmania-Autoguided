@@ -8,6 +8,14 @@ Created on Wed Apr 28 16:27:47 2021
 from PIL import ImageGrab
 import cv2
 import numpy as np
+from time import time
+import os
+
+
+
+####                 ####
+####     FONCTIONS   ####
+####                 ####
 
 
 def between(array, borne_min, borne_max):
@@ -33,16 +41,43 @@ def is_road(array):
     return (array[:,:,0] >= 60) \
          & (array[:,:,1] >= 60) \
          & (array[:,:,2] >= 60)
+         
+         
+def get_line(pixel_debut, pixel_fin, nb_points):
+    """Renvoie une liste de pixels equidistants
+       sur la ligne (pixel_debut - pixel_fin)"""
+       
+    distance_y = pixel_fin[0] - pixel_debut[0]
+    distance_x = pixel_fin[1] - pixel_debut[1]
+    
+    return [(pixel_debut[0] + int(distance_y/nb_points*i),
+            pixel_debut[1] + int(distance_x/nb_points*i))
+            for i in range(nb_points+1)]
+    
+    
+    
+####                 ####
+####     CLASSES     ####
+####                 ####
     
     
 class ImageAcquisition:
     
-    """Capture, affiche, enregistre le jeu"""
+    """Capture et affiche les images du jeu"""
     
     def __init__(self):
         self.coord_hg = (0, 30)      #bord haut-gauche de la fenetre de jeu
         self.coord_bd = (655, 510)   #bord bas-droit de la fenetre de jeu
-        
+  
+        #Vectors utilisés comme inputs lors de l'apprentissage automatique
+        self.list_vectors = [get_line((270, 327),(160, 327), 60),
+                             get_line((270, 290),(160, 290), 60),
+                             get_line((270, 364),(160, 364), 60),
+                             get_line((290, 260),(130, 190), 60),
+                             get_line((290, 394),(130, 464), 60),
+                             get_line((325, 240),(295, 45), 60),
+                             get_line((325, 414),(295, 609), 60)]
+    
         
     def take_screenshot(self):
         """Prend un screenshot de la fenetre de jeu sous forme de np.array"""
@@ -57,28 +92,129 @@ class ImageAcquisition:
             img = self.take_screenshot()
             img = (is_road(img) | is_finish(img)) *255
             img = np.array(img, dtype = np.uint8)
+            
+            #Gray -> BGR pour VISUALISER. 
+            #Ne pas le faire pour l'apprentissage automatique 
+            img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+            
+            for vector in self.list_vectors:
+                vector_bool = list(map(lambda pixel : np.any(img[pixel] ==0), vector))
+                
+                try:
+                    index = vector_bool.index(True)
+                    pos_mur = vector[index]
+                except ValueError:
+                    pos_mur = vector[-1]
+                    
+                #cv2.line est sous le format (x,y) !
+                img = cv2.line(img,                           #image
+                               (vector[0][1], vector[0][0]),  #pixel debut
+                               (pos_mur[1], pos_mur[0]),      #pixel fin
+                               (0,255,0),                     #couleur
+                               3)                             #epaisseur
+                
             cv2.imshow('window', img)
             if cv2.waitKey(25) & 0xFF == ord('q'):
                 cv2.destroyAllWindows()
                 continuer = False
   
 
-              
+
 class InputsAcquisition:
     
     """Capture les inputs claviers"""
     
+    def __init__(self):
+        #liste des touches utilisees pour jouer
+        self.used_keys = ['haut', 'bas', 'gauche', 'droite']
+    
+    
     def get_inputs(self):
-        """"""
-        pass
+        """Renvoie les inputs utilises a l'instant t"""
+        
+        for key in self.used_keys:
+            pass
+
+    
+class DataRecorder:
+    
+    """Enregistre la data : images + inputs"""
+    
+    def __init__(self):
+        
+        #dossier d'enregistrement
+        self.data_directory = '../data'
+        
+        #nom du fichier d'enregistrement
+        self.record_file = '../data/record'
+        
+        #Cree le dossier s'il n'existe pas.
+        if not os.path.exists(self.data_directory):
+            os.makedirs(self.data_directory)
+            
+            #initialise l'index du premier fichier d'enregistrement
+            self.index = 0
+        
+        #Si le dossier existe
+        else:
+            
+            #On recherche le fichier de plus grand index
+            try:
+                
+                #On recupere tous les fichier du dossier data_directory
+                existing_files = os.listdir(self.data_directory)
+                
+                #On recupere leurs indexs
+                record_indexs = map(lambda file : int(file[6:-4]), existing_files)
+                
+                #On recupere le max des indexs
+                max_index = max(record_indexs)
+                
+                #On determine l'index du prochain fichier d'enregistrement
+                self.index = max_index +1
+                
+            #S'il n'y a aucun fichier, on initialise l'index du premier.
+            except ValueError:
+                self.index = 0
+            
+        
+    def record(self):
+        """Enregistre la data dans le fichier self.data_file"""
+        
+        data = []
+            
+        data.append([1,2])
+        np.save(self.record_file + str(self.index), data)
+        self.index += 1
+    
     
     
 ####                        ####
 ####   ESPACE BROUILLON     ####
 ####                        ####
  
-#img = ((img[:,:,0] >60)&(img[:,:,1] >60)&(img[:,:,2] >60))*255       
-#img3= np.array([[0 for i in range(200)]for j in range(300)], dtype = np.uint8)
+# Gray -> BGR pour VISUALISER. 
+# Ne pas le faire pour l'apprentissage automatique
+# img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+
+#   a = list(map(lambda x: np.any(img(x) ==0), get_line((270, 327),(160, 327), 20)))
+# try :
+#     index = a.index(True)
+#     pixel = get_line((270, 327),(160, 327), 20)[index]
+# except ValueError:
+#     pixel = (160,327)
+
+# for i in get_line((270, 327),(160, 327), 20):
+#     pixel_mur = 
+#     if np.any(img[i] == 0) :
+                    
+#         #cv2.line est sous le format (x,y) !
+# img = cv2.line(img, (327,270), (pos_mur[1], pos_mur[0]), (0,255,0), 3) 
+                    
+#         break
+# img = cv2.line(img, (50,50), (150,150), (0,255,0), 9)  
+# img = ((img[:,:,0] >60)&(img[:,:,1] >60)&(img[:,:,2] >60))*255       
+# img3= np.array([[0 for i in range(200)]for j in range(300)], dtype = np.uint8)
 # img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 # img = cv2.Canny(img, threshold1= 200, threshold2=200)
 # lines = cv2.HoughLinesP(img, 1, np.pi/180, 180, 20, 15)
