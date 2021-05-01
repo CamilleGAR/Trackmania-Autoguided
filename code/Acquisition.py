@@ -12,8 +12,8 @@ import os
 import keyboard
 from Variables import *
 from Fonctions import *
+import time
 
-   
     
 class ImageAcquisition:
     
@@ -22,23 +22,51 @@ class ImageAcquisition:
     def __init__(self):
         self.coord_hg = COORD_HG   #bord haut-gauche de la fenetre de jeu
         self.coord_bd = COORD_BD   #bord bas-droit de la fenetre de jeu
+        
+        #coordonnees du compteur de vitesse
+        self.comp_u = COMPTEUR_UNITE
+        self.comp_d = COMPTEUR_DIZAINE
+        self.comp_c = COMPTEUR_CENTAINE
   
         #Vecteurs utilisés comme inputs lors de l'apprentissage automatique
-        self.list_vectors = LIST_VECTORS
+        self.list_vectors = list(map(
+            lambda pixels: get_line(*pixels, 60),
+            LIST_VECTORS))
     
         
-    def take_screenshot(self):
+    def take_entire_screenshot(self):
         """Prend un screenshot de la fenetre de jeu sous forme de np.array"""
     
         return(np.array(ImageGrab.grab(bbox = self.coord_hg + self.coord_bd)))
     
     
+    def rogner_screens_compteur(self, full_img):
+        """Renvoie un screenshot pour l'unite, la dizaine, la centaine
+           du compteur de vitesse a partir du screen de l'ecran complet"""
+           
+        return [
+            full_img[self.comp_c['y1']:self.comp_c['y2'],
+                     self.comp_c['x1']:self.comp_c['x2']],
+            full_img[self.comp_d['y1']:self.comp_d['y2'],
+                     self.comp_d['x1']:self.comp_d['x2']],
+            full_img[self.comp_u['y1']:self.comp_u['y2'],
+                     self.comp_u['x1']:self.comp_u['x2']]
+            ]
+                  
+      
     def show_live(self):
         """Affiche simplement l'ecran de jeu"""
         
         continuer = True
         while continuer:
-            img = self.take_screenshot()
+            
+            #On prend un screen de l'ecran de jeu
+            img = self.take_entire_screenshot()
+            
+            #On recupere sur ce screen le compteur de vitesse
+            screens_compteur = self.rogner_screens_compteur(img)
+            
+            #Delimitation de la route
             img = (is_road(img) | is_finish(img)) *255
             img = np.array(img, dtype = np.uint8)
             
@@ -46,22 +74,26 @@ class ImageAcquisition:
             #Ne pas le faire pour l'apprentissage automatique 
             img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
             
+            #Pour chaque vecteur qui sert de capteur
             for vector in self.list_vectors:
-                vector_bool = list(map(lambda pixel : np.any(img[pixel] ==0), vector))
                 
+                #On va chercher le pixel noir (mur) le plus proche
+                vector_bool = list(map(lambda pixel : np.any(img[pixel] ==0), vector))         
                 try:
                     index = vector_bool.index(True)
                     pos_mur = vector[index]
                 except ValueError:
                     pos_mur = vector[-1]
                     
-                #cv2.line est sous le format (x,y) !
-                img = cv2.line(img,                           #image
-                               (vector[0][1], vector[0][0]),  #pixel debut
-                               (pos_mur[1], pos_mur[0]),      #pixel fin
-                               (0,255,0),                     #couleur
-                               3)                             #epaisseur
+                #On affiche ce vecteur
+                #cv2.line est sous le format de coordonnees (x,y) !
+                cv2.line(img,                          #image
+                        (vector[0][1], vector[0][0]),  #pixel debut
+                        (pos_mur[1], pos_mur[0]),      #pixel fin
+                        (0,255,0),                     #couleur
+                         3)                            #epaisseur
                 
+                #On affiche la valeur du vecteur
                 cv2.putText(img,                                    #image
                             str(get_distance(vector[0], pos_mur)),  #texte
                             (vector[0][1], vector[0][0]),           #position
@@ -70,6 +102,18 @@ class ImageAcquisition:
                             (0,0,255),                              #couleur
                             2)                                      #epaisseur
             
+            #On lit la vitesse pas reconnaissance d'image
+            valeur_compteur = reconnaitre_nombre(*screens_compteur)          
+            
+            #On affiche la vitesse
+            cv2.putText(img,                        #image
+                        str(valeur_compteur),       #texte
+                        (580, 465),                 #position
+                        cv2.FONT_HERSHEY_SIMPLEX,   #font
+                        1,                        #taille
+                        (0,0,255),                  #couleur
+                        2)                          #epaisseur
+              
             cv2.imshow('live', img)
             if cv2.waitKey(25) & 0xFF == ord('q'):
                 cv2.destroyAllWindows()
