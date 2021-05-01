@@ -10,73 +10,22 @@ import cv2
 import numpy as np
 from time import time
 import os
+import keyboard
+from Variables import *
+from Fonctions import *
 
-
-
-####                 ####
-####     FONCTIONS   ####
-####                 ####
-
-
-def between(array, borne_min, borne_max):
-    """Verifie pour chaque valeur d'un array qu'elle soit
-    comprise entre les bornes min et max"""
-    
-    return (array >= borne_min) & (array <= borne_max)
-
-
-def is_finish(array):
-    """Verifie si l'element percu est la ligne d'arrivee.
-       On le verifie grace a sa couleur rouge"""
-       
-    return between(array[:,:,0], 100, 200) \
-         & between(array[:,:,1], 30, 70)   \
-         & between(array[:,:,2], 30, 70)
-
-
-def is_road(array):
-    """Verifie si l'element percu est la route.
-       On le verifie grace a sa couleur grise"""
-       
-    return (array[:,:,0] >= 60) \
-         & (array[:,:,1] >= 60) \
-         & (array[:,:,2] >= 60)
-         
-         
-def get_line(pixel_debut, pixel_fin, nb_points):
-    """Renvoie une liste de pixels equidistants
-       sur la ligne (pixel_debut - pixel_fin)"""
-       
-    distance_y = pixel_fin[0] - pixel_debut[0]
-    distance_x = pixel_fin[1] - pixel_debut[1]
-    
-    return [(pixel_debut[0] + int(distance_y/nb_points*i),
-            pixel_debut[1] + int(distance_x/nb_points*i))
-            for i in range(nb_points+1)]
-    
-    
-    
-####                 ####
-####     CLASSES     ####
-####                 ####
-    
+   
     
 class ImageAcquisition:
     
     """Capture et affiche les images du jeu"""
     
     def __init__(self):
-        self.coord_hg = (0, 30)      #bord haut-gauche de la fenetre de jeu
-        self.coord_bd = (655, 510)   #bord bas-droit de la fenetre de jeu
+        self.coord_hg = COORD_HG   #bord haut-gauche de la fenetre de jeu
+        self.coord_bd = COORD_BD   #bord bas-droit de la fenetre de jeu
   
-        #Vectors utilisés comme inputs lors de l'apprentissage automatique
-        self.list_vectors = [get_line((270, 327),(160, 327), 60),
-                             get_line((270, 290),(160, 290), 60),
-                             get_line((270, 364),(160, 364), 60),
-                             get_line((290, 260),(130, 190), 60),
-                             get_line((290, 394),(130, 464), 60),
-                             get_line((325, 240),(295, 45), 60),
-                             get_line((325, 414),(295, 609), 60)]
+        #Vecteurs utilisés comme inputs lors de l'apprentissage automatique
+        self.list_vectors = LIST_VECORS
     
         
     def take_screenshot(self):
@@ -84,7 +33,8 @@ class ImageAcquisition:
     
         return(np.array(ImageGrab.grab(bbox = self.coord_hg + self.coord_bd)))
     
-    def show(self):
+    
+    def show_live(self):
         """Affiche simplement l'ecran de jeu"""
         
         continuer = True
@@ -117,7 +67,24 @@ class ImageAcquisition:
             if cv2.waitKey(25) & 0xFF == ord('q'):
                 cv2.destroyAllWindows()
                 continuer = False
-  
+                
+                
+    def show_data(self, file_name):
+        """Affiche la video contenue dans un fichier .npy"""
+        
+        data_file = np.load(file_name, allow_pickle = True)
+        
+        #Pour chaque frame de la video
+        for frame in data_file:
+            img = frame[0]           #Image
+            inputs = frame[1]        #Inputs
+            cv2.imshow('window', img)
+            print(inputs)
+            if cv2.waitKey(25) & 0xFF == ord('q'):
+                cv2.destroyAllWindows()
+                break
+        cv2.destroyAllWindows()
+    
 
 
 class InputsAcquisition:
@@ -126,14 +93,32 @@ class InputsAcquisition:
     
     def __init__(self):
         #liste des touches utilisees pour jouer
-        self.used_keys = ['haut', 'bas', 'gauche', 'droite']
+        self.targeted_keys = ['haut', 'bas', 'gauche', 'droite', 'enter', 'backspace', 'q']
     
     
     def get_inputs(self):
         """Renvoie les inputs utilises a l'instant t"""
         
-        for key in self.used_keys:
-            pass
+        #On verifie quelles touches de notre liste self.targeted_keys sont utilisees
+        used_keys = list()
+        for key in self.targeted_keys:
+            if keyboard.is_pressed(key):
+                used_keys.append(key)
+          
+        #Si on appuie sur q, on ne prend pas en compte les autres touches
+        if 'q' in used_keys:
+            return['q']
+        
+        #Si on appuie sur backspace, on ne prend pas en compte les autres touches
+        if 'backspace' in used_keys:
+            return ['backspace']
+        
+        #Si on appuie sur enter, on ne prend pas en compte les autres touches
+        if 'enter' in used_keys:
+            return ['enter']
+    
+        return used_keys
+            
 
     
 class DataRecorder:
@@ -147,6 +132,10 @@ class DataRecorder:
         
         #nom du fichier d'enregistrement
         self.record_file = '../data/record'
+        
+        #Objets d'acquisition
+        self.image_acquisition = ImageAcquisition()
+        self.inputs_acquisition = InputsAcquisition()
         
         #Cree le dossier s'il n'existe pas.
         if not os.path.exists(self.data_directory):
@@ -179,14 +168,33 @@ class DataRecorder:
             
         
     def record(self):
-        """Enregistre la data dans le fichier self.data_file"""
+        """Enregistre la data dans le dossier self.data_directory"""
+
+        data = list()
         
-        data = []
+        while True:
+            img = self.image_acquisition.take_screenshot()
+            inputs = self.inputs_acquisition.get_inputs()
             
-        data.append([1,2])
-        np.save(self.record_file + str(self.index), data)
-        self.index += 1
-    
+            #On ajoute le coupe (image - inputs) a notre data
+            data.append((img, inputs))
+            
+            #'enter' valide la run, 
+            #On enregiste la data et incremente l'index pour la suivante
+            if inputs == ['enter']:
+                np.save(self.record_file + str(self.index), data)
+                data = list()
+                self.index += 1
+            
+            #'backspace' signifie qu'on recommence la run,
+            #On efface l'enregistrement pour en faire un autre
+            elif inputs == ['backspace']:
+                data = list()
+                
+            #'q' sert a couper l'enregistrement
+            elif inputs == ['q']:
+                break
+
     
     
 ####                        ####
