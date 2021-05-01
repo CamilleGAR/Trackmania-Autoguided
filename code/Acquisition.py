@@ -8,7 +8,6 @@ Created on Wed Apr 28 16:27:47 2021
 from PIL import ImageGrab
 import cv2
 import numpy as np
-from time import time
 import os
 import keyboard
 from Variables import *
@@ -25,7 +24,7 @@ class ImageAcquisition:
         self.coord_bd = COORD_BD   #bord bas-droit de la fenetre de jeu
   
         #Vecteurs utilisés comme inputs lors de l'apprentissage automatique
-        self.list_vectors = LIST_VECORS
+        self.list_vectors = LIST_VECTORS
     
         
     def take_screenshot(self):
@@ -63,7 +62,15 @@ class ImageAcquisition:
                                (0,255,0),                     #couleur
                                3)                             #epaisseur
                 
-            cv2.imshow('window', img)
+                cv2.putText(img,                                    #image
+                            str(get_distance(vector[0], pos_mur)),  #texte
+                            (vector[0][1], vector[0][0]),           #position
+                            cv2.FONT_HERSHEY_SIMPLEX,               #font
+                            0.5,                                    #taille
+                            (0,0,255),                              #couleur
+                            2)                                      #epaisseur
+            
+            cv2.imshow('live', img)
             if cv2.waitKey(25) & 0xFF == ord('q'):
                 cv2.destroyAllWindows()
                 continuer = False
@@ -78,7 +85,7 @@ class ImageAcquisition:
         for frame in data_file:
             img = frame[0]           #Image
             inputs = frame[1]        #Inputs
-            cv2.imshow('window', img)
+            cv2.imshow('enregistrement', img)
             print(inputs)
             if cv2.waitKey(25) & 0xFF == ord('q'):
                 cv2.destroyAllWindows()

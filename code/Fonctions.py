@@ -5,6 +5,7 @@ Created on Sat May  1 17:58:27 2021
 @author: camil
 """
 
+import numpy as np
 
 def between(array, borne_min, borne_max):
     """Verifie pour chaque valeur d'un array qu'elle soit
@@ -40,3 +41,14 @@ def is_road(array):
          & (array[:,:,1] >= 60) \
          & (array[:,:,2] >= 60)
          
+         
+def get_distance(pixel_debut, pixel_fin):
+    """Renvoie la distance (en pixels) entre deux pixels"""
+    
+    x = pixel_fin[1] - pixel_debut[1]
+    y = pixel_fin[0] - pixel_debut[0]
+    return int(np.sqrt(x**2 + y**2))
+
+
+def reconnaitre_nombre(*chiffres):
+    pass
