@@ -28,23 +28,37 @@ class Preprocessor:
         self.image_acquisition = ImageAcquisition()
     
     
+    def get_binary_inputs(self, str_inputs):
+        """Transformation des inputs en liste binaire"""
+        
+        return [str_inputs == ['gauche'],                    
+                str_inputs == ['haut'],
+                str_inputs == ['droite'],
+                str_inputs == ['bas'],
+                str_inputs == ['haut', 'gauche'],
+                str_inputs == ['haut', 'droite'],
+                str_inputs == ['bas', 'droite'],
+                str_inputs == ['bas', 'droite'],
+                str_inputs == []]
+    
+    
     def preprocessing_frame_type0(self, frame):
         """Methode 0 du preprocessing sur une unique image"""
         
         img = frame[0]
-        inputs = frame[1]
+        str_inputs = frame[1]
         
         #Transformation des inputs en liste binaire
-        binary_inputs = [inputs == ['gauche'],           
-                         inputs == ['haut'],
-                         inputs == ['droite'],
-                         inputs == ['bas'],
-                         inputs == ['haut', 'gauche'],
-                         inputs == ['haut', 'droite'],
-                         inputs == ['bas', 'droite'],
-                         inputs == ['bas', 'droite'],
-                         inputs == []]
+        binary_inputs = self.get_binary_inputs(str_inputs)
         
+        #les inputs dont on va avoir besoin pour cette methode.
+        #Sert juste a verifier la validite des inputs, mais on renvoie la liste complete.
+        current_inputs = [binary_inputs[i] for i in [0,1,2,4,5,8]]
+        
+        #Si aucun input n'est valide, on ne renvoie pas la frame
+        if not any(current_inputs):
+            return None
+    
         #On recupere sur ce screen le compteur de vitesse
         screens_compteur = self.image_acquisition.rogner_screens_compteur(img)
                 
@@ -138,9 +152,10 @@ class Preprocessor:
                 frame_processed_data = self.preprocessing_frame_type0(frame)
                 
                 #On l'ajoute a notre array
-                processed_data_array = np.append(processed_data_array, 
-                                                 frame_processed_data,
-                                                 axis = 0)
+                if type(frame_processed_data) != type(None):
+                    processed_data_array = np.append(processed_data_array, 
+                                                     frame_processed_data,
+                                                     axis = 0)
             #Delete les frames ininteressantes
             processed_data_array = self.delete_outliers(processed_data_array)
             processed_data_array = self.delete_speed0(processed_data_array)
