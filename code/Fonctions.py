@@ -104,3 +104,11 @@ def reconnaitre_nombre(*screenshots_chiffres):
     #On envite un bug sur un nombre vide ''
     if nombre == '': return 0
     return int(nombre)
+
+
+def check_diff(nb_1, nb_2, nb_3):
+    """Verifie que le nb_2 n'ait pas une difference de +50 par rapport au deux autres
+       Sert pour eviter les bugs de reconnaissance de vitesse"""
+       
+    return (abs(nb_2 - nb_1) > 50) \
+         & (abs(nb_2 - nb_3) > 50)
