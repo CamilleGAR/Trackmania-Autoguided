@@ -38,8 +38,11 @@ class Preprocessor:
         binary_inputs = [inputs == ['gauche'],           
                          inputs == ['haut'],
                          inputs == ['droite'],
+                         inputs == ['bas'],
                          inputs == ['haut', 'gauche'],
                          inputs == ['haut', 'droite'],
+                         inputs == ['bas', 'droite'],
+                         inputs == ['bas', 'droite'],
                          inputs == []]
         
         #On recupere sur ce screen le compteur de vitesse
@@ -67,7 +70,7 @@ class Preprocessor:
         #On lit la vitesse par reconnaissance d'image
         vitesse = [reconnaitre_nombre(*screens_compteur)]          
 
-        return np.array([[vector_outputs, vitesse, inputs]])
+        return np.array([[vector_outputs, vitesse, binary_inputs]])
     
         
     def delete_outliers(self, processed_data_array):
@@ -124,7 +127,9 @@ class Preprocessor:
             data = np.load(f'{self.data_directory}/{file_name}', allow_pickle = True)
             
             #
-            processed_data_array = np.array([[[0,0,0,0,0,0,0],[0]]])
+            processed_data_array = np.array([[[0,0,0,0,0,0,0],           #capteurs
+                                              [0],                       #vitesse
+                                              [0,0,0,0,0,0,0,0,0]]])     #inputs
             
             #Preprocessing de chaque frame
             for frame in data:
