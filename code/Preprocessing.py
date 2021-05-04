@@ -32,6 +32,15 @@ class Preprocessor:
         """Methode 0 du preprocessing sur une unique image"""
         
         img = frame[0]
+        inputs = frame[1]
+        
+        #Transformation des inputs en liste binaire
+        binary_inputs = [inputs == ['gauche'],           
+                         inputs == ['haut'],
+                         inputs == ['droite'],
+                         inputs == ['haut', 'gauche'],
+                         inputs == ['haut', 'droite'],
+                         inputs == []]
         
         #On recupere sur ce screen le compteur de vitesse
         screens_compteur = self.image_acquisition.rogner_screens_compteur(img)
@@ -58,8 +67,8 @@ class Preprocessor:
         #On lit la vitesse par reconnaissance d'image
         vitesse = [reconnaitre_nombre(*screens_compteur)]          
 
-        return np.array([[vector_outputs, vitesse]])
-     
+        return np.array([[vector_outputs, vitesse, inputs]])
+    
         
     def delete_outliers(self, processed_data_array):
         """Delete les frames avec des valeurs de capteurs incohérentes"""
@@ -96,10 +105,10 @@ class Preprocessor:
                 
         return del_speed0
     
-    def delete_first_last_frames(self, nb_frames):
+    def delete_first_last_frames(self, processed_data_array, nb_frames):
         """Deletes de nb_frames premieres et dernieres frames"""
         
-        pass
+        return processed_data_array[50:-50]
     
         
     def preprocessing(self, preprocessing_directory = '../data_preprocessed_type0'):
@@ -127,12 +136,11 @@ class Preprocessor:
                 processed_data_array = np.append(processed_data_array, 
                                                  frame_processed_data,
                                                  axis = 0)
-            print(len( processed_data_array)) 
+            #Delete les frames ininteressantes
             processed_data_array = self.delete_outliers(processed_data_array)
-            print(len( processed_data_array))
             processed_data_array = self.delete_speed0(processed_data_array)
-            print(len( processed_data_array))
-            #processed_data_array = self.delete_first_last_frames(processed_data_array, 50)
-            
-            # np.save(f'{preprocessing_directory}/{file_name[:-4]}_preprocessed', 
-            #         data)
+            processed_data_array = self.delete_first_last_frames(processed_data_array, 50)
+
+            #On enregistre la data exploitable
+            print(processed_data_array)
+            np.save(f'{preprocessing_directory}/{file_name[:-4]}_preprocessed', processed_data_array)
