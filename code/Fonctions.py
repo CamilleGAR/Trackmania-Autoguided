@@ -112,3 +112,14 @@ def check_diff(nb_1, nb_2, nb_3):
        
     return (abs(nb_2 - nb_1) > 50) \
          & (abs(nb_2 - nb_3) > 50)
+         
+         
+def get_key_code(direction):
+    """Donne le code correspondant a la touche directionnelle"""
+    
+    codes = {'haut': 0xC8,
+             'bas': 0xD0,
+             'gauche': 0xCB,
+             'droite': 0xCD}
+    
+    return codes[direction]

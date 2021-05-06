@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """
 Created on Sat May  1 17:53:12 2021
-
 @author: camil
 """
 
@@ -48,17 +47,6 @@ class Preprocessor:
         img = frame[0]
         str_inputs = frame[1]
         
-        #Transformation des inputs en liste binaire
-        binary_inputs = self.get_binary_inputs(str_inputs)
-        
-        #les inputs dont on va avoir besoin pour cette methode.
-        #Sert juste a verifier la validite des inputs, mais on renvoie la liste complete.
-        current_inputs = [binary_inputs[i] for i in [0,1,2,4,5,8]]
-        
-        #Si aucun input n'est valide, on ne renvoie pas la frame
-        if not any(current_inputs):
-            return None
-    
         #On recupere sur ce screen le compteur de vitesse
         screens_compteur = self.image_acquisition.rogner_screens_compteur(img)
                 
@@ -82,9 +70,26 @@ class Preprocessor:
             vector_outputs.append(get_distance(vector[0], pos_mur))
                 
         #On lit la vitesse par reconnaissance d'image
-        vitesse = [reconnaitre_nombre(*screens_compteur)]          
-
-        return np.array([[vector_outputs, vitesse, binary_inputs]])
+        vitesse = [reconnaitre_nombre(*screens_compteur)]       
+        
+        #Si on a les inputs (dataset de training)
+        if str_inputs != None:
+            #Transformation des inputs en liste binaire
+            binary_inputs = self.get_binary_inputs(str_inputs)
+            
+            #les inputs dont on va avoir besoin pour cette methode.
+            #Sert juste a verifier la validite des inputs, mais on renvoie la liste complete.
+            current_inputs = [binary_inputs[i] for i in [0,1,2,3,4,5,6,7,8]]
+            
+            #Si aucun input n'est valide, on ne renvoie pas la frame
+            if not any(current_inputs):
+                return None
+    
+            return np.array([[vector_outputs, vitesse, binary_inputs]])
+        
+        #Si on ne les a pas (prediction)
+        else:
+            return np.array([[vector_outputs, vitesse]], dtype = object)
     
         
     def delete_outliers(self, processed_data_array):
@@ -162,5 +167,4 @@ class Preprocessor:
             processed_data_array = self.delete_first_last_frames(processed_data_array, 50)
 
             #On enregistre la data exploitable
-            print(processed_data_array)
             np.save(f'{preprocessing_directory}/{file_name[:-4]}_preprocessed', processed_data_array)
