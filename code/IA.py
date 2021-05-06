@@ -64,6 +64,33 @@ class IaLearner:
         return count
     
     
+    def normalize(self, df, training_data = False):
+        """Normalize la data"""
+        
+        columns_data = [column for column in df 
+                        if ('capteur' in column or 'vitesse' in column)]
+        columns_boolean = [column for column in df if column not in columns_data]
+        
+        #Si c'est le training set, on setup pour normalizer le reste
+        if training_data:
+            self.df_min = df[columns_data].min()
+            self.df_max = df[columns_data].max()
+            
+        #Partie data normalizee
+        df_data_norm = df[columns_data]-self.df_min/(self.df_max-self.df_min)
+                        
+        #Partie boolean inchangee
+        df_boolean = df[columns_boolean]
+        
+        #On concatene la data normalize et les bools
+        df_normalized =  df = pd.concat([df_data_norm, df_boolean], axis=1, join="inner")
+        
+        return df_normalized
+            
+            
+            
+        
+    
     def setup_data(self, *combinaisons_keyboard):
         """Shuffle, normalize, repartie, ... la data
            Renvoie des dataframes"""
@@ -96,13 +123,16 @@ class IaLearner:
         min_inputs = min(df_map)
         
         #On shuffle le dataframe
-        df.sample(frac = 1)
+        df_first_shuffle = df.sample(frac = 1)
         
         #On recupere une fraction des {min_inputs} premiers True de chaque colonne
-        df_equilibre = pd.concat(df.loc[df[f'keyboard_inputs{i}'] == True][:int(min_inputs*0.6)]
+        df_equilibre = pd.concat(df.loc[df_first_shuffle[f'keyboard_inputs{i}'] == True][:int(min_inputs*0.6)]
                        for i in combinaisons_keyboard)
         
-        return df_equilibre
+        df_shuffled = df_equilibre.sample(frac = 1)
+        
+        
+        return df_shuffled
         
         
         #On supprime les inputs clavier qu'on utilise pas dans ce training
