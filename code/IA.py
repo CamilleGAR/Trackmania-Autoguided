@@ -14,6 +14,7 @@ from tensorflow.keras.layers import Dropout
 from Acquisition import *
 from Preprocessing import *
 from matplotlib import pyplot
+import threading
 import numpy as np
 import pandas as pd
 import functools
@@ -119,10 +120,10 @@ class IaLearner:
         #On compte pour chaque inputs clavier
         df_map=map(lambda column: self.count_true(df, column), 
                    [f'keyboard_inputs{i}' for i in combinaisons_keyboard])
-        
+
         #On regarde quel est le minimum d'inputs
         min_inputs = min(df_map)
-        
+
         #On shuffle le dataframe
         df_first_shuffle = df.sample(frac = 1)
         
@@ -168,13 +169,15 @@ class IaLearner:
                         activation='relu',
                         kernel_initializer='he_normal',
                         input_shape=(nb_features,)))
-        model.add(Dense(25, activation='relu', kernel_initializer='he_normal'))
-        model.add(Dropout(0))
-        model.add(Dense(25, activation='relu', kernel_initializer='he_normal'))
-        model.add(Dropout(0))
-        model.add(Dense(25, activation='relu', kernel_initializer='he_normal'))
-        model.add(Dropout(0))
-        model.add(Dense(25, activation='relu', kernel_initializer='he_normal'))
+        model.add(Dropout(0.2))
+        model.add(Dense(100, activation='relu', kernel_initializer='he_normal'))
+        model.add(Dropout(0.2))
+        model.add(Dense(100, activation='relu', kernel_initializer='he_normal'))
+        model.add(Dropout(0.2))
+        model.add(Dense(100, activation='relu', kernel_initializer='he_normal'))
+        model.add(Dropout(0.2))
+        model.add(Dense(100, activation='relu', kernel_initializer='he_normal'))
+        model.add(Dropout(0.2))
         model.add(Dense(nb_outputs, activation='softmax'))
         
         model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
@@ -202,7 +205,12 @@ class IaPlayer:
         self.image_acquisition = ImageAcquisition()
         self.preprocessor = Preprocessor()
         
-    def play(self):
+    def play(self, show = False):
+        
+        #Thread pour visualiser les capteurs
+        if show:
+            thread = threading.Thread(target=self.image_acquisition.show_live86)
+            thread.start()
         
         #Laisse le temps de cliquer sur l'ecran puis force le start
         time.sleep(2)
