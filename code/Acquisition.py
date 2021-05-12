@@ -96,7 +96,7 @@ class ImageAcquisition:
                 #On affiche la valeur du vecteur
                 cv2.putText(img,                                    #image
                             str(get_distance(vector[0], pos_mur)),  #texte
-                            (vector[0][1], vector[0][0]),           #position
+                            (vector[0][1], vector[0][0]+25),           #position
                             cv2.FONT_HERSHEY_SIMPLEX,               #font
                             0.5,                                    #taille
                             (0,0,255),                              #couleur

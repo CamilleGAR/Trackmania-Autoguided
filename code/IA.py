@@ -11,6 +11,8 @@ from sklearn.model_selection import train_test_split
 from tensorflow.keras import Sequential
 from tensorflow.keras.layers import Dense
 from tensorflow.keras.layers import Dropout
+from tensorflow.keras.optimizers import SGD, Adam
+from tensorflow.keras.optimizers.schedules import ExponentialDecay
 from Acquisition import *
 from Preprocessing import *
 from matplotlib import pyplot
@@ -44,9 +46,7 @@ class IaLearner:
         
     def setup_inputs_keyboard(self, *inputs):
         """"Setup les inputs claviers (outputs de notre reseaux)"""
-        possible_inputs = [['gauche'],['haut'],['droite'],['bas'],
-                          ['haut', 'gauche'],['haut', 'droite'],['bas', 'droite'],['bas', 'droite'],
-                          []]
+        possible_inputs = [['gauche'],['haut', 'gauche'],['haut'],['haut', 'droite'],['droite']]
         self.keyboard_inputs_str = [possible_inputs[i] for i in inputs]
         self.keyboard_inputs_int = inputs
         self.keyboard_columns_df = [f'keyboard_inputs{i}' for i in inputs]
@@ -68,6 +68,7 @@ class IaLearner:
             count = dataframe[column_name].value_counts()[True]
         except KeyError:
             count = 0
+            
         return count
     
     
@@ -99,7 +100,7 @@ class IaLearner:
     
         #On choisi les inputs clavier que l'on souhaite utiliser
         self.setup_inputs_keyboard(*combinaisons_keyboard)
-        
+
         data = self.data
         
         #detail data
@@ -107,29 +108,49 @@ class IaLearner:
         vitesse = data[:,1]
         keyboard_inputs = data[:,2]
         
+        capteurs_to_list = pd.DataFrame(capteurs)[0].to_list()
+        vitesse_to_list = pd.DataFrame(vitesse)[0].to_list()
+        keyboard_inputs_to_list = pd.DataFrame(keyboard_inputs)[0].to_list()
+        
         #dataframes data
-        df_capteurs = pd.DataFrame(pd.DataFrame(data[:,0])[0].to_list(),
+        df_capteurs = pd.DataFrame(capteurs_to_list,
                                    columns = [f'capteur{i}' for i in range(len(capteurs[0]))])
-        df_vitesse = pd.DataFrame(pd.DataFrame(data[:,1])[0].to_list(), 
+        df_vitesse = pd.DataFrame(vitesse_to_list, 
                                   columns = ['vitesse'])
-        df_keyboard_inputs = pd.DataFrame(pd.DataFrame(data[:,2])[0].to_list(), 
+        df_keyboard_inputs = pd.DataFrame(keyboard_inputs_to_list, 
                                           columns = [f'keyboard_inputs{i}' for i in range(len(keyboard_inputs[0]))])
         
-        df = pd.concat([df_capteurs, df_vitesse, df_keyboard_inputs], axis=1, join="inner")
+        df_non_reversed = pd.concat([df_capteurs, df_vitesse, df_keyboard_inputs], axis=1, join="inner")
+
+        #Reverse des capteurs et directions
+        capteurs_to_list_reversed = map(lambda x: list(reversed(x)),
+                                       capteurs_to_list)                                
+        keyboard_inputs_to_list_reversed = map(lambda x: list(reversed(x)),
+                                               keyboard_inputs_to_list)
+        
+        #dataframes data reversed
+        df_capteurs_reversed = pd.DataFrame(capteurs_to_list_reversed,
+                                   columns = [f'capteur{i}' for i in range(len(capteurs[0]))])
+        df_keyboard_inputs_reversed = pd.DataFrame(keyboard_inputs_to_list_reversed, 
+                                          columns = [f'keyboard_inputs{i}' for i in range(len(keyboard_inputs[0]))])
+        
+        df_reversed = pd.concat([df_capteurs_reversed, df_vitesse, df_keyboard_inputs_reversed], axis=1, join="inner")
+        
+        df = pd.concat([df_non_reversed, df_reversed])
         
         #On compte pour chaque inputs clavier
-        df_map=map(lambda column: self.count_true(df, column), 
+        df_map = map(lambda column: self.count_true(df, column), 
                    [f'keyboard_inputs{i}' for i in combinaisons_keyboard])
 
         #On regarde quel est le minimum d'inputs
         min_inputs = min(df_map)
-
+        
         #On shuffle le dataframe
         df_first_shuffle = df.sample(frac = 1)
         
-        #On recupere une fraction des {min_inputs} premiers True de chaque colonne
-        df_equilibre = pd.concat(df.loc[df_first_shuffle[f'keyboard_inputs{i}'] == True][:int(min_inputs*0.6)]
-                       for i in combinaisons_keyboard)
+        #Recupere les {min_inputs} premiers True de chaque colonne
+        df_equilibre = pd.concat(df_first_shuffle.loc[df_first_shuffle[f'keyboard_inputs{i}'] == True][:int(min_inputs)] 
+                                 for i in combinaisons_keyboard)
         
         #On shuffle pour avoir un ensemble homogene
         df_shuffled = df_equilibre.sample(frac = 1)
@@ -157,32 +178,30 @@ class IaLearner:
     def train(self):
         
         #Recupere les dataframes
-        X_train, X_test, y_train, y_test = self.setup_data(0,1,2,4,5) #Combinaisons keyboard qu'on utilise ici
+        X_train, X_test, y_train, y_test = self.setup_data(0,1,2,3,4) #Arguments initialement varibles. Plus maintenant
         
         # determine the number of input features
         nb_features = X_train.shape[1]
         nb_outputs = y_train.shape[1]
 
         model = Sequential()
-        
+
         model.add(Dense(100,
                         activation='relu',
                         kernel_initializer='he_normal',
                         input_shape=(nb_features,)))
-        model.add(Dropout(0.2))
+        model.add(Dropout(0.15))
         model.add(Dense(100, activation='relu', kernel_initializer='he_normal'))
-        model.add(Dropout(0.2))
+        model.add(Dropout(0.15))
         model.add(Dense(100, activation='relu', kernel_initializer='he_normal'))
-        model.add(Dropout(0.2))
+        model.add(Dropout(0.15))
         model.add(Dense(100, activation='relu', kernel_initializer='he_normal'))
-        model.add(Dropout(0.2))
-        model.add(Dense(100, activation='relu', kernel_initializer='he_normal'))
-        model.add(Dropout(0.2))
+        model.add(Dropout(0.15))
         model.add(Dense(nb_outputs, activation='softmax'))
-        
-        model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
-        
-        history = model.fit(X_train, y_train, epochs=150, batch_size=32, verbose=1, validation_split=0.3)
+        model.compile(optimizer = Adam(learning_rate = 0.0015),  
+                      loss ='categorical_crossentropy', 
+                      metrics = ['accuracy'])
+        history = model.fit(X_train, y_train, epochs=100, batch_size=128, verbose=1, validation_split=0.3)
         
         pyplot.title('Learning Curves')
         pyplot.xlabel('Epoch')
@@ -209,7 +228,7 @@ class IaPlayer:
         
         #Thread pour visualiser les capteurs
         if show:
-            thread = threading.Thread(target=self.image_acquisition.show_live86)
+            thread = threading.Thread(target=self.image_acquisition.show_live)
             thread.start()
         
         #Laisse le temps de cliquer sur l'ecran puis force le start
@@ -226,7 +245,6 @@ class IaPlayer:
             capteurs_et_vitesse_normalized = (capteurs_et_vitesse-self.df_min)/(self.df_max-self.df_min)
             num_input = np.argmax(self.model.predict([capteurs_et_vitesse_normalized.to_list()]))
             keys = self.keyboard_inputs_str[num_input]
-            print(keys)
             for key in ['haut', 'bas', 'gauche', 'droite']:
                 if key in keys:
                     PressKey(get_key_code(key))
@@ -234,6 +252,68 @@ class IaPlayer:
                     ReleaseKey(get_key_code(key))
 
         
+
+      # model = Sequential()
+
+      #   model.add(Dense(50,
+      #                   activation='relu',
+      #                   kernel_initializer='he_normal',
+      #                   input_shape=(nb_features,)))
+      #   model.add(Dense(50, activation='relu', kernel_initializer='he_normal'))
+      #   model.add(Dense(50, activation='relu', kernel_initializer='he_normal'))
+      #   model.add(Dense(50, activation='relu', kernel_initializer='he_normal'))
+      #   model.add(Dense(50, activation='relu', kernel_initializer='he_normal'))
+      #   model.add(Dense(nb_outputs, activation='softmax'))
+        
+      #   opt = SGD(learning_rate=0.0001, momentum=0.5)
+      #   model.compile(optimizer=opt, loss='categorical_crossentropy', metrics=['accuracy'])
+         
+      #   history = model.fit(X_train, y_train, epochs=1000, batch_size=128, verbose=1, validation_split=0.3)       
+                    
+                    
+                    
+                    
+                    
+        #               model.add(Dense(50,
+        #                 activation='relu',
+        #                 kernel_initializer='he_normal',
+        #                 input_shape=(nb_features,)))
+        # model.add(Dense(50, activation='relu', kernel_initializer='he_normal'))
+        # model.add(Dense(50, activation='relu', kernel_initializer='he_normal'))
+        # model.add(Dense(50, activation='relu', kernel_initializer='he_normal'))
+        # model.add(Dense(50, activation='relu', kernel_initializer='he_normal'))
+        # model.add(Dense(nb_outputs, activation='softmax'))
+         #model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+         
+        # history = model.fit(X_train, y_train, epochs=100, batch_size=32, verbose=1, validation_split=0.3)
         
         
         
+       #      model.add(Dense(100,
+       #                  activation='relu',
+       #                  kernel_initializer='he_normal',
+       #                  input_shape=(nb_features,)))
+       #  model.add(Dense(100, activation='relu', kernel_initializer='he_normal'))
+       #  model.add(Dense(100, activation='relu', kernel_initializer='he_normal'))
+       #  model.add(Dense(100, activation='relu', kernel_initializer='he_normal'))
+       # # model.add(Dense(50, activation='relu', kernel_initializer='he_normal'))
+       # # model.add(Dense(50, activation='relu', kernel_initializer='he_normal'))
+       #  model.add(Dense(nb_outputs, activation='softmax'))
+       #  model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+       #  history = model.fit(X_train, y_train, epochs=100, batch_size=128, verbose=1, 
+                    
+                    
+        #               model.add(Dense(100,
+        #                 activation='relu',
+        #                 kernel_initializer='he_normal',
+        #                 input_shape=(nb_features,)))
+        # model.add(Dropout(0.1))
+        # model.add(Dense(100, activation='relu', kernel_initializer='he_normal'))
+        # model.add(Dropout(0.1))
+        # model.add(Dense(100, activation='relu', kernel_initializer='he_normal'))
+        # model.add(Dropout(0.1))
+        # model.add(Dense(100, activation='relu', kernel_initializer='he_normal'))
+        # model.add(Dropout(0.1))
+        # model.add(Dense(nb_outputs, activation='softmax'))
+        # model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+        # history = model.fit(X_train, y_train, epochs=100, batch_size=128, verbose=1, validation_split=0.3)

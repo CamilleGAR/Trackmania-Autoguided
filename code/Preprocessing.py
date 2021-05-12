@@ -30,16 +30,13 @@ class Preprocessor:
     def get_binary_inputs(self, str_inputs):
         """Transformation des inputs en liste binaire"""
         
-        return [str_inputs == ['gauche'],                    
-                str_inputs == ['haut'],
-                str_inputs == ['droite'],
-                str_inputs == ['bas'],
+        return [str_inputs == ['gauche'],
                 str_inputs == ['haut', 'gauche'],
+                str_inputs == ['haut'],
                 str_inputs == ['haut', 'droite'],
-                str_inputs == ['bas', 'droite'],
-                str_inputs == ['bas', 'droite'],
-                str_inputs == []]
+                str_inputs == ['droite']]
     
+
     
     def preprocessing_frame_type0(self, frame):
         """Methode 0 du preprocessing sur une unique image"""
@@ -79,7 +76,7 @@ class Preprocessor:
             
             #les inputs dont on va avoir besoin pour cette methode.
             #Sert juste a verifier la validite des inputs, mais on renvoie la liste complete.
-            current_inputs = [binary_inputs[i] for i in [0,1,2,3,4,5,6,7,8]]
+            current_inputs = [binary_inputs[i] for i in [0,1,2,3,4]]
             
             #Si aucun input n'est valide, on ne renvoie pas la frame
             if not any(current_inputs):
